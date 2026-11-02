@@ -76,18 +76,19 @@ cd ~/turtlebot3_ws/src/lane_detection_ad/lane_detection_ad && python3 -m pytest 
 
 ## 2. 실차 실행
 
-YOLO가 도는 컴퓨터(로봇 또는 노트북)에서 3번 터미널을 띄운다. 노트북에서 돌리면 카메라 JPEG가 Wi-Fi로 넘어오므로, 로그의 `age`(지연)를 꼭 확인한다.
+`lane_robot.launch.py`는 선배의 `camera_ros publisher`(카메라 → `/camera`)와 차선 노드를 같이 띄운다. 그래서 로봇에서는 터미널 2개면 된다.
 
 ```bash
 # 터미널 1 (로봇): 모터, 오도메트리
 ros2 launch turtlebot3_bringup robot.launch.py
 
-# 터미널 2 (로봇): 카메라 → /camera
-ros2 run camera_ros publisher
-
-# 터미널 3: 차선 노드. 기본은 대기 상태라 바로 출발하지 않음. v_max 기본 0.08
+# 터미널 2 (로봇): 카메라 + 차선 노드. 기본은 대기 상태라 바로 출발하지 않음. v_max 기본 0.08
 ros2 launch lane_detection_ad lane_robot.launch.py 2>&1 | tee ~/lane_log_$(date +%m%d_%H%M).txt
 ```
+
+- `camera_ros publisher`를 이미 따로 띄웠으면 `camera:=false`를 준다. 같은 카메라를 두 번 열면 충돌한다.
+- `camera_ros`는 영상 창(cv2.imshow)을 띄우므로 로봇에 화면(모니터나 원격 데스크톱)이 있어야 한다.
+- YOLO를 노트북에서 돌리려면 로봇에서는 `ros2 run camera_ros publisher`만 띄운다. 노트북에서는 `lane_robot.launch.py camera:=false`를 실행한다(같은 `ROS_DOMAIN_ID`). 이 경우 카메라 JPEG가 Wi-Fi로 넘어오므로 로그의 `age`(지연)를 꼭 확인한다.
 
 ### 출발, 정지, 비상 정지
 
@@ -106,7 +107,7 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"             # 비상
 | `start_enabled` | false | true면 `/lane_state` 없이 바로 출발 |
 | `v_max` | 0.08 | 최고 속도 m/s. 첫 주행은 낮게, 안정되면 0.10 → 0.12 |
 | `show` | false | OpenCV 창 (모니터가 연결된 컴퓨터에서만) |
-| `camera` | false | true면 터미널 2 대신 이 launch가 `camera_ros publisher`도 띄움 |
+| `camera` | true | 선배 `camera_ros publisher`를 같이 띄움. 이미 따로 띄웠으면 false |
 | `hardcoded` | false | true면 구간 판단 노드(`section_judge`)도 띄움. 4번 참고 |
 | `start_section` | '' | 하드코딩판의 시작 구간 이름 |
 | `params_file` | config/lane_params.yaml | 파라미터 파일 교체 |
@@ -114,7 +115,7 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"             # 비상
 예시:
 
 ```bash
-ros2 launch lane_detection_ad lane_robot.launch.py camera:=true start_enabled:=true v_max:=0.10
+ros2 launch lane_detection_ad lane_robot.launch.py start_enabled:=true v_max:=0.10
 ```
 
 ### 보기와 기록

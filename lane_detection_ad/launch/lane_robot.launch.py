@@ -2,7 +2,7 @@
 
   ros2 launch lane_detection_ad lane_robot.launch.py                      # waits for /lane_state true
   ros2 launch lane_detection_ad lane_robot.launch.py start_enabled:=true  # drives immediately
-  ros2 launch lane_detection_ad lane_robot.launch.py camera:=true         # also starts camera_ros publisher
+  ros2 launch lane_detection_ad lane_robot.launch.py camera:=false        # camera_ros publisher already running
   ros2 launch lane_detection_ad lane_robot.launch.py hardcoded:=true start_section:=after_parking
 
 turtlebot3_bringup (robot.launch.py) must run separately on the robot (it provides /odom, takes /cmd_vel).
@@ -27,7 +27,8 @@ def generate_launch_description():
                               description='true: drive at once; false: wait for /lane_state true'),
         DeclareLaunchArgument('v_max', default_value='0.08', description='m/s, first real runs: keep low'),
         DeclareLaunchArgument('show', default_value='false', description='OpenCV window (needs a display)'),
-        DeclareLaunchArgument('camera', default_value='false', description='also run camera_ros publisher'),
+        DeclareLaunchArgument('camera', default_value='true',
+                              description="run the senior's camera_ros publisher (/camera); false if it already runs"),
         DeclareLaunchArgument('hardcoded', default_value='false', description='also run section_judge'),
         DeclareLaunchArgument('start_section', default_value=''),
         Node(
