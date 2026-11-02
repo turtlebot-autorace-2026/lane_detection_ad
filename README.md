@@ -28,16 +28,26 @@ export ROS_DOMAIN_ID=30          # 로봇과 PC가 같은 값이어야 함 (팀�
 
 ### 1-1. 워크스페이스와 패키지 가져오기
 
-이 패키지는 repo에 이미 만들어져 있다. 그래서 `ros2 pkg create`는 필요 없고, clone하는 것이 패키지 생성 단계다.
+이 repo 하나에 패키지 두 개가 들어 있다. clone 한 번이면 끝이다(`ros2 pkg create` 필요 없음).
 
-**선배 `camera_ros`가 꼭 필요하다.** 실차 launch가 `camera_ros`의 `publisher`(카메라 → `/camera`)와 `test`(영상 뷰어)를 같이 띄운다. 그래서 두 repo를 같은 워크스페이스에 넣는다.
+| 폴더 | 내용 |
+| --- | --- |
+| `lane_detection_ad/` | 차선 패키지 (이번에 만든 것) |
+| `camera_ros/` | 선배 `turtlebot-autorace-2026/camera_ros`를 그대로 복사한 것 (커밋 cf15991, 2026-10-28, 수정 없음). 실차 launch가 여기 있는 `publisher`(카메라 → `/camera`)와 `test`(영상 뷰어)를 띄운다 |
 
 ```bash
-mkdir -p ~/turtlebot3_ws/src            # 로봇에 이미 있으면 그 워크스페이스를 그대로 사용
+mkdir -p ~/turtlebot3_ws/src
 cd ~/turtlebot3_ws/src
-git clone https://github.com/turtlebot-autorace-2026/camera_ros          # 선배 카메라 패키지 (이미 있으면 git pull)
 git clone https://github.com/turtlebot-autorace-2026/lane_detection_ad
 ```
+
+**주의: 워크스페이스에 선배 `camera_ros`가 따로 또 있으면 빌드가 실패한다.** colcon이 "Duplicate package names"로 멈춘다. 로봇의 `~/turtlebot3_ws/src`에 이미 `camera_ros`가 있으면 기존 것을 빌드에서 빼야 한다(지우지 않아도 됨).
+
+```bash
+touch ~/turtlebot3_ws/src/camera_ros/COLCON_IGNORE
+```
+
+선배가 `camera_ros`를 업데이트하면 이 복사본에는 자동으로 반영되지 않는다. 다시 복사해서 커밋해야 한다.
 
 ### 1-2. 의존성
 

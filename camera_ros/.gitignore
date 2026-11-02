@@ -1,0 +1,14 @@
+# Python generated artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# ROS build and runtime artifacts
+build/
+install/
+log/
+
+# Local calibration backups and captured image sessions
+/calibration_backups/
+/camera_ros/calibration_images/*/
