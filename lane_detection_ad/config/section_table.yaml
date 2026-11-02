@@ -1,0 +1,21 @@
+# Hardcoded section order for the autorace_gazebo v014 map (= rulebook TB3 map), driving direction
+# of the default spawn (yellow line on the left).
+#
+# length_m: odometry distance driven in the section before the next one starts.
+#           -1 = stay until an anchor arrives on /lane/section_anchor (std_msgs/String, section name).
+# Mission sections are -1 on purpose: the intersection (random left/right branch) and the parking
+# manoeuvre make "distance from the start" meaningless, so the mission state machine must re-anchor
+# (e.g. publish "after_parking" when parking is done). Until it exists, anchor by hand:
+#   ros2 topic pub --once /lane/section_anchor std_msgs/msg/String "{data: after_parking}"
+#
+# Lengths are ESTIMATES measured on course_surface.png (1 px = 5.09 mm at 900 px), tune in Gazebo.
+sections:
+  - {name: start,          type: curve,    length_m: 3.0}   # start straight, left corner, small U into the oval
+  - {name: intersection,   type: mission,  length_m: -1}
+  - {name: after_intersection, type: curve, length_m: 4.0}  # S-bend, right-side straight, curve to the left
+  - {name: construction,   type: mission,  length_m: -1}
+  - {name: after_construction, type: curve, length_m: 1.0}  # bottom-left corner to the parking stub
+  - {name: parking,        type: mission,  length_m: -1}
+  - {name: after_parking,  type: zigzag,   length_m: 1.8}   # 0.28 straight + 27 deg legs 0.33/0.65/0.33 + 0.13
+  - {name: serpentine,     type: curve,    length_m: -1}    # U-bends, level crossing inside
+  - {name: tunnel,         type: mission,  length_m: -1}

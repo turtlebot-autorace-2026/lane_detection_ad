@@ -1,0 +1,56 @@
+# lane_detection_ad parameters. Doubles MUST keep a decimal point (ROS 2 rejects 1 for a double).
+lane_detection_ad:
+  ros__parameters:
+    # node
+    model_path: ''
+    conf: 0.4
+    imgsz: 640
+    device: ''
+    show: true
+    publish_debug: true
+    process_hz: 15.0
+    start_enabled: false
+    image_topic: /camera
+    cmd_vel_topic: cmd_vel
+    odom_topic: /odom
+    camera_timeout: 0.5
+    log_period: 0.5
+    # estimator / controller (see lane_estimator.py DEFAULTS for meaning)
+    robot_x: 326.0
+    camera_height: 0.129
+    camera_ahead_of_axle: 0.076
+    lane_width_px: 320.0
+    learn_lane_width: true
+    lane_width_alpha: 0.05
+    line_width: 0.026
+    robot_half_width: 0.09
+    roi_top_row: 220
+    roi_half_width: 250
+    row_step: 8
+    min_points: 5
+    max_jump_px: 30.0
+    single_offset: 0.5
+    memory_behind: 0.25
+    hold_distance: 0.1
+    hold_time: 1.0
+    control_length: 0.12
+    latency: 0.15
+    v_max: 0.12
+    v_max_intersection: 0.08
+    v_min: 0.03
+    a_lat_max: 0.03
+    preview_max: 0.55
+    preview_decel: 0.05
+    kink_deg: 30.0
+    kink_pivot: false
+    pivot_dist: 0.01
+    pivot_done_deg: 8.0
+    pivot_timeout: 4.0
+    v_single: 0.8
+    v_memory: 0.6
+    slow_margin: 0.02
+    max_ang: 1.2
+    max_ang_acc: 6.0
+    max_lin_acc: 0.3
+    search_after: 1.0
+    search_ang: 0.4

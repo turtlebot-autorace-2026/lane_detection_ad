@@ -1,0 +1,13 @@
+# Parameter overrides per section type (lane node, topic /lane/section).
+# auto    = general version: geometry seen by the camera decides everything
+# others  = hardcoded version: section_judge says which section we are in
+# Any key of lane_estimator.DEFAULTS can be overridden. Keep decimal points on doubles.
+# Offline (perfect masks) v_max hardly changes bend/zigzag error because the curvature preview
+# already limits speed there; the gain of the hardcoded version is mostly speed on straights.
+auto: {}
+straight:
+  v_max: 0.15
+curve: {}
+zigzag:
+  control_length: 0.10   # offline: zigzag 30 -> 27 mm, bends 17 -> 13 mm; shorter = twitchier on noisy masks
+mission: {}
