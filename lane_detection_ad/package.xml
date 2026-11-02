@@ -14,6 +14,7 @@
   <depend>nav_msgs</depend>
   <depend>ament_index_python</depend>
   <exec_depend>launch</exec_depend>
+  <!-- camera_ros (turtlebot-autorace-2026/camera_ros) is only needed for lane_robot.launch.py camera:=true -->
   <exec_depend>launch_ros</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-opencv</exec_depend>

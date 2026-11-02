@@ -263,14 +263,18 @@ def main():
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('Keyboard Interrupt (SIGINT)')
+        pass
     finally:
+        for _ in range(3):              # make sure the robot stops on Ctrl+C
+            try:
+                node.velocityPublisher.publish(Twist())
+            except Exception:
+                break
         try:
-            node.velocityPublisher.publish(Twist())
+            node.destroy_node()
+            rclpy.shutdown()
         except Exception:
             pass
-        node.destroy_node()
-        rclpy.shutdown()
 
 
 if __name__ == '__main__':
