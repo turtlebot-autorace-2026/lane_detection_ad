@@ -1,4 +1,5 @@
-"""Real robot (ROS 2 Galactic): lane following, optionally with the camera node and the hardcoded section judge.
+"""Real robot (ROS 2 Galactic): senior's camera_ros publisher + camera_ros test viewer + lane node
+(+ hardcoded section judge). Needs turtlebot-autorace-2026/camera_ros built in the same workspace.
 
   ros2 launch lane_detection_ad lane_robot.launch.py                      # waits for /lane_state true
   ros2 launch lane_detection_ad lane_robot.launch.py start_enabled:=true  # drives immediately
@@ -26,7 +27,8 @@ def generate_launch_description():
         DeclareLaunchArgument('start_enabled', default_value='false',
                               description='true: drive at once; false: wait for /lane_state true'),
         DeclareLaunchArgument('v_max', default_value='0.08', description='m/s, first real runs: keep low'),
-        DeclareLaunchArgument('show', default_value='false', description='OpenCV window (needs a display)'),
+        DeclareLaunchArgument('show', default_value='true', description='lane debug window (needs a display)'),
+        DeclareLaunchArgument('viewer', default_value='true', description="camera_ros test: /camera viewer window"),
         DeclareLaunchArgument('camera', default_value='true',
                               description="run the senior's camera_ros publisher (/camera); false if it already runs"),
         DeclareLaunchArgument('hardcoded', default_value='false', description='also run section_judge'),
@@ -34,6 +36,10 @@ def generate_launch_description():
         Node(
             package='camera_ros', executable='publisher', name='camera_publisher', output='screen',
             condition=IfCondition(arg('camera')),
+        ),
+        Node(
+            package='camera_ros', executable='test', name='camera_viewer', output='screen',
+            condition=IfCondition(arg('viewer')),
         ),
         Node(
             package='lane_detection_ad', executable='detection', name='lane_detection_ad', output='screen',

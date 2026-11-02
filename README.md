@@ -30,10 +30,12 @@ export ROS_DOMAIN_ID=30          # 로봇과 PC가 같은 값이어야 함 (팀�
 
 이 패키지는 repo에 이미 만들어져 있다. 그래서 `ros2 pkg create`는 필요 없고, clone하는 것이 패키지 생성 단계다.
 
+**선배 `camera_ros`가 꼭 필요하다.** 실차 launch가 `camera_ros`의 `publisher`(카메라 → `/camera`)와 `test`(영상 뷰어)를 같이 띄운다. 그래서 두 repo를 같은 워크스페이스에 넣는다.
+
 ```bash
 mkdir -p ~/turtlebot3_ws/src            # 로봇에 이미 있으면 그 워크스페이스를 그대로 사용
 cd ~/turtlebot3_ws/src
-git clone https://github.com/turtlebot-autorace-2026/camera_ros          # 이미 있으면 생략
+git clone https://github.com/turtlebot-autorace-2026/camera_ros          # 선배 카메라 패키지 (이미 있으면 git pull)
 git clone https://github.com/turtlebot-autorace-2026/lane_detection_ad
 ```
 
@@ -60,11 +62,13 @@ source install/setup.bash
 ### 1-4. 확인
 
 ```bash
+ros2 pkg executables camera_ros
+# camera_ros calibration / publisher / publisher2 / test / test2
 ros2 pkg executables lane_detection_ad
-# lane_detection_ad detection
-# lane_detection_ad section_judge
-# lane_detection_ad sim_camera_bridge
+# lane_detection_ad detection / section_judge / sim_camera_bridge
 ```
+
+둘 중 하나라도 안 나오면 `source install/setup.bash`를 안 했거나 빌드가 실패한 것이다.
 
 선택: ROS 없이 돌아가는 오프라인 테스트다.
 
@@ -76,7 +80,11 @@ cd ~/turtlebot3_ws/src/lane_detection_ad/lane_detection_ad && python3 -m pytest 
 
 ## 2. 실차 실행
 
-`lane_robot.launch.py`는 선배의 `camera_ros publisher`(카메라 → `/camera`)와 차선 노드를 같이 띄운다. 그래서 로봇에서는 터미널 2개면 된다.
+`lane_robot.launch.py` 하나가 아래 세 개를 같이 띄운다. 그래서 로봇에서는 터미널 2개면 된다.
+
+- 선배 `camera_ros publisher`: 카메라 → `/camera`
+- 선배 `camera_ros test`: `/camera` 영상 창
+- 차선 노드: 디버그 창 포함
 
 ```bash
 # 터미널 1 (로봇): 모터, 오도메트리
@@ -87,7 +95,7 @@ ros2 launch lane_detection_ad lane_robot.launch.py 2>&1 | tee ~/lane_log_$(date 
 ```
 
 - `camera_ros publisher`를 이미 따로 띄웠으면 `camera:=false`를 준다. 같은 카메라를 두 번 열면 충돌한다.
-- `camera_ros`는 영상 창(cv2.imshow)을 띄우므로 로봇에 화면(모니터나 원격 데스크톱)이 있어야 한다.
+- 창이 3개 뜬다(`publisher`의 보정 영상, `test` 영상, 차선 디버그). 로봇에 화면(모니터나 원격 데스크톱)이 있어야 한다. 창을 줄이려면 `viewer:=false` 또는 `show:=false`를 준다.
 - YOLO를 노트북에서 돌리려면 로봇에서는 `ros2 run camera_ros publisher`만 띄운다. 노트북에서는 `lane_robot.launch.py camera:=false`를 실행한다(같은 `ROS_DOMAIN_ID`). 이 경우 카메라 JPEG가 Wi-Fi로 넘어오므로 로그의 `age`(지연)를 꼭 확인한다.
 
 ### 출발, 정지, 비상 정지
@@ -106,7 +114,8 @@ ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist "{}"             # 비상
 | --- | --- | --- |
 | `start_enabled` | false | true면 `/lane_state` 없이 바로 출발 |
 | `v_max` | 0.08 | 최고 속도 m/s. 첫 주행은 낮게, 안정되면 0.10 → 0.12 |
-| `show` | false | OpenCV 창 (모니터가 연결된 컴퓨터에서만) |
+| `show` | true | 차선 디버그 창 (선, 중심 경로, 로그 숫자) |
+| `viewer` | true | 선배 `camera_ros test` 영상 창 (`/camera`) |
 | `camera` | true | 선배 `camera_ros publisher`를 같이 띄움. 이미 따로 띄웠으면 false |
 | `hardcoded` | false | true면 구간 판단 노드(`section_judge`)도 띄움. 4번 참고 |
 | `start_section` | '' | 하드코딩판의 시작 구간 이름 |
