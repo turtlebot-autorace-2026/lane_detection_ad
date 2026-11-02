@@ -35,16 +35,15 @@ export ROS_DOMAIN_ID=30          # 로봇과 PC가 같은 값이어야 함 (팀�
 | `lane_detection_ad/` | 차선 패키지 (이번에 만든 것) |
 | `camera_ros/` | 선배 `turtlebot-autorace-2026/camera_ros`를 그대로 복사한 것 (커밋 cf15991, 2026-10-28, 수정 없음). 실차 launch가 여기 있는 `publisher`(카메라 → `/camera`)와 `test`(영상 뷰어)를 띄운다 |
 
+워크스페이스는 기존 `~/turtlebot3_ws`와 **따로** `~/autorace_ad_ws`로 만든다.
+
+- 기존 워크스페이스에 넣으면 선배 `camera_ros`가 두 개가 되어 colcon이 "Duplicate package names"로 멈춘다.
+- 기존 워크스페이스는 건드리지 않는다.
+
 ```bash
-mkdir -p ~/turtlebot3_ws/src
-cd ~/turtlebot3_ws/src
+mkdir -p ~/autorace_ad_ws/src
+cd ~/autorace_ad_ws/src
 git clone https://github.com/turtlebot-autorace-2026/lane_detection_ad
-```
-
-**주의: 워크스페이스에 선배 `camera_ros`가 따로 또 있으면 빌드가 실패한다.** colcon이 "Duplicate package names"로 멈춘다. 로봇의 `~/turtlebot3_ws/src`에 이미 `camera_ros`가 있으면 기존 것을 빌드에서 빼야 한다(지우지 않아도 됨).
-
-```bash
-touch ~/turtlebot3_ws/src/camera_ros/COLCON_IGNORE
 ```
 
 선배가 `camera_ros`를 업데이트하면 이 복사본에는 자동으로 반영되지 않는다. 다시 복사해서 커밋해야 한다.
@@ -62,9 +61,9 @@ pip3 show ultralytics || pip3 install ultralytics
 ### 1-3. 빌드
 
 ```bash
-cd ~/turtlebot3_ws
+cd ~/autorace_ad_ws
 colcon build --symlink-install --packages-select camera_ros lane_detection_ad
-source install/setup.bash
+source ~/autorace_ad_ws/install/setup.bash
 ```
 
 `--symlink-install`은 꼭 붙인다. `camera_ros`가 보정 파일(`camera_calibration.pkl`)을 소스 폴더 기준으로 찾기 때문에, 이 옵션이 없으면 카메라 노드가 시작하지 않는다.
@@ -78,12 +77,14 @@ ros2 pkg executables lane_detection_ad
 # lane_detection_ad detection / section_judge / sim_camera_bridge
 ```
 
-둘 중 하나라도 안 나오면 `source install/setup.bash`를 안 했거나 빌드가 실패한 것이다.
+둘 중 하나라도 안 나오면 `source ~/autorace_ad_ws/install/setup.bash`를 안 했거나 빌드가 실패한 것이다.
+
+`~/.bashrc`에서 이미 `~/turtlebot3_ws/install/setup.bash`를 source하고 있어도 괜찮다. **`~/autorace_ad_ws`를 그 뒤에 source하면** `camera_ros`는 이 repo의 것이 쓰인다(내용은 같음).
 
 선택: ROS 없이 돌아가는 오프라인 테스트다.
 
 ```bash
-cd ~/turtlebot3_ws/src/lane_detection_ad/lane_detection_ad && python3 -m pytest -q -s test
+cd ~/autorace_ad_ws/src/lane_detection_ad/lane_detection_ad && python3 -m pytest -q -s test
 ```
 
 ---
@@ -97,12 +98,22 @@ cd ~/turtlebot3_ws/src/lane_detection_ad/lane_detection_ad && python3 -m pytest 
 - 차선 노드: 디버그 창 포함
 
 ```bash
-# 터미널 1 (로봇): 모터, 오도메트리
+# 터미널 1 (로봇): 모터, 오도메트리. turtlebot3_bringup이 있는 기존 워크스페이스 그대로
+source /opt/ros/galactic/setup.bash
+source ~/turtlebot3_ws/install/setup.bash        # turtlebot3를 apt로 깔았으면 이 줄 생략
 ros2 launch turtlebot3_bringup robot.launch.py
 
-# 터미널 2 (로봇): 카메라 + 차선 노드. 기본은 대기 상태라 바로 출발하지 않음. v_max 기본 0.08
+# 터미널 2 (로봇): 카메라 + 뷰어 + 차선 노드. 기본은 대기 상태라 바로 출발하지 않음. v_max 기본 0.08
+source /opt/ros/galactic/setup.bash
+source ~/autorace_ad_ws/install/setup.bash
 ros2 launch lane_detection_ad lane_robot.launch.py 2>&1 | tee ~/lane_log_$(date +%m%d_%H%M).txt
 ```
+
+**카메라 보정은 선배 것 그대로다.**
+
+- 차선 노드는 선배 `camera_ros publisher`가 보정 파일(`camera_calibration.pkl`)로 왜곡 보정한 `/camera`(640×480)를 받는다.
+- 그 위에 선배 `lane_detection_dl`의 BEV 변환을 그대로 쓴다. 다시 보정하는 코드는 없다.
+- 카메라를 다시 캘리브레이션하거나 카메라 각도를 바꾸면, 보정 후 영상의 크롭이 달라진다. 그러면 BEV 기준점(`lane_estimator.py`의 `BEV_SRC`)도 다시 맞춰야 한다.
 
 - `camera_ros publisher`를 이미 따로 띄웠으면 `camera:=false`를 준다. 같은 카메라를 두 번 열면 충돌한다.
 - 창이 3개 뜬다(`publisher`의 보정 영상, `test` 영상, 차선 디버그). 로봇에 화면(모니터나 원격 데스크톱)이 있어야 한다. 창을 줄이려면 `viewer:=false` 또는 `show:=false`를 준다.
@@ -163,11 +174,12 @@ ros2 bag record -o lane_test_$(date +%m%d_%H%M) /camera /odom /cmd_vel /lane_det
 
 ## 3. Gazebo 실행
 
-`autorace_gazebo`(hakee 맵)도 같은 워크스페이스에 넣고 빌드한다.
+`autorace_gazebo`(hakee 맵)도 같은 `~/autorace_ad_ws`에 넣고 빌드한다.
 
 ```bash
-cd ~/turtlebot3_ws && colcon build --symlink-install --packages-select autorace_gazebo lane_detection_ad
-source install/setup.bash
+cp -r autorace_gazebo ~/autorace_ad_ws/src/        # hakee가 준 Gazebo 패키지
+cd ~/autorace_ad_ws && colcon build --symlink-install --packages-select autorace_gazebo lane_detection_ad
+source ~/autorace_ad_ws/install/setup.bash
 
 # 터미널 1
 ros2 launch autorace_gazebo autorace.launch.py
