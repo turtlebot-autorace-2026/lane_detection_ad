@@ -8,7 +8,6 @@ Additions: /odom for the path memory, start_enabled, camera watchdog, periodic s
 '''
 import math
 import os
-import threading
 import time
 
 import cv2
@@ -83,6 +82,7 @@ class LaneDetection(Node):
         self.create_subscription(Bool, '/intersection_state', self.intersectionStateSubscriber_callback, 10)
         self.create_subscription(Odometry, self.get_parameter('odom_topic').value, self.odom_callback, 10)
         self.create_subscription(String, '/lane/section', self.section_callback, 10)
+        self.create_subscription(String, '/lane/follow_line', self.followLine_callback, 10)
         with open(self.get_parameter('profiles_file').value) as f:
             self.profiles = yaml.safe_load(f) or {}
         self.section = 'auto'
@@ -94,6 +94,7 @@ class LaneDetection(Node):
         self.lane_mode = True   # True = yellow (left)
         self.state = bool(self.get_parameter('start_enabled').value)
         self.is_intersection = False
+        self.follow_line = 'both'
         self.estimator = LaneEstimator(self.lane_config())
         self.latest_msg = None
         self.odom_pose, self.odom_t = None, None
@@ -134,31 +135,30 @@ class LaneDetection(Node):
         self.get_logger().info('section %s -> %s %s' % (self.section, msg.data, self.profiles[msg.data] or ''))
         self.section = msg.data
 
-    # ---- senior's mode handling (unchanged behaviour) ---------------------------------
+    # ---- mode inputs (driven by the mission FSM) ---------------------------------------
 
     def intersectionStateSubscriber_callback(self, msg):
-        if not self.is_intersection and msg.data:
+        '''Only a speed flag now (v_max_intersection). The senior's 25/12/28 s timers that changed
+        lane_mode on their own were removed: the mission FSM decides the line (/lane/follow_line).'''
+        if msg.data != self.is_intersection:
             self.is_intersection = msg.data
-            self.get_logger().info('===>> Start Intersection Mode')
-        if self.is_intersection and not msg.data:
-            self.is_intersection = msg.data
-            self.get_logger().info('===>> Finish Intersection Mode')
-            if self.lane_mode:
-                threading.Timer(25.0, self.intersection_left_handling).start()
-            else:
-                threading.Timer(12.0, self.intersection_right_handling).start()
-                threading.Timer(28.0, self.intersection_right_handling2).start()
+            self.get_logger().info('intersection speed %s' % ('ON' if msg.data else 'OFF'))
 
-    def intersection_left_handling(self):
-        self.lane_mode = False
-
-    def intersection_right_handling(self):
-        self.lane_mode = True
-
-    def intersection_right_handling2(self):
-        self.lane_mode = False
+    def followLine_callback(self, msg):
+        '''both (normal) | yellow | white: use only that line. Idempotent, may be re-sent.'''
+        value = msg.data.strip().lower()
+        if value not in ('both', 'yellow', 'white'):
+            self.get_logger().warn('unknown /lane/follow_line %r (both|yellow|white)' % msg.data)
+            return
+        if value != self.follow_line:
+            self.get_logger().info('follow_line %s -> %s' % (self.follow_line, value))
+            self.follow_line = value
 
     def stateSubscriber_callback(self, msg):
+        '''Edge-triggered: a repeated True/False is ignored, so the mission FSM can re-send it
+        safely. To restart with a fresh estimator, send False then True.'''
+        if msg.data == self.state:
+            return
         self.state = msg.data
         if self.state:
             self.estimator = LaneEstimator(self.lane_config())
@@ -233,7 +233,7 @@ class LaneDetection(Node):
         detections = self.detect(bev)
         self.infer_ms = (time.monotonic() - t0) * 1000.0
         v, w = self.estimator.update(detections, self.pose, now, lane_mode=self.lane_mode,
-                                     intersection=self.is_intersection)
+                                     intersection=self.is_intersection, follow_line=self.follow_line)
         twist = Twist()
         twist.linear.x = v
         twist.angular.z = w
@@ -253,7 +253,8 @@ class LaneDetection(Node):
 
         if now - self.last_log_t >= self.log_period:
             self.last_log_t = now
-            self.get_logger().info('[%s] ' % self.section + ' | '.join(self.estimator.debug_lines())
+            follow = '' if self.follow_line == 'both' else ' follow=%s' % self.follow_line
+            self.get_logger().info('[%s%s] ' % (self.section, follow) + ' | '.join(self.estimator.debug_lines())
                                    + ' | infer=%.0fms age=%.0fms' % (self.infer_ms, self.age_ms))
 
 

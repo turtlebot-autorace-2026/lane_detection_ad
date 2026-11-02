@@ -241,6 +241,14 @@ ros2 topic pub --once /lane/section_anchor std_msgs/msg/String "{data: after_par
 
 호환: 선배 노드와 같은 토픽(`/camera`, `/lane_state`, `/lane_mode`, `/intersection_state`, `cmd_vel`, `/lane_detection/debug/compressed`)을 쓴다. 추가로 `/odom`을 구독한다.
 
+미션 FSM(`missions_v1`)용 입력:
+
+| 토픽 | 타입 | 동작 |
+| --- | --- | --- |
+| `/lane_state` | Bool | 바뀔 때만 반응. 같은 값을 반복해 보내도 추정기를 초기화하지 않는다(새로 시작하려면 false → true) |
+| `/lane/follow_line` | String | `both`(기본) / `yellow` / `white`. 지정한 선 하나만 따라간다(교차로 분기용) |
+| `/intersection_state` | Bool | 속도 제한(`v_max_intersection`)만 켠다. 선배 코드의 25/12/28초 타이머로 `lane_mode`를 바꾸던 동작은 지웠다 |
+
 참고: BEV 맨 아래(로봇 앞 17 cm)에서 보이는 폭은 ±12 cm뿐이다. 그래서 로봇 바로 앞에서는 두 선이 동시에 거의 안 보이고, 한쪽 선 모드가 많은 건 정상이다.
 
 ### 오프라인 결과 (Gazebo, 실차 아님)

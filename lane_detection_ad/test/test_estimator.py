@@ -113,6 +113,35 @@ def test_single_line_centre():
         assert abs(est.debug['e_y']) < 0.01, (which, est.debug['e_y'])
 
 
+def fork_dets(cfg, c, pose, widen):
+    '''Yellow where it belongs, white `widen` m further right: a pair that is still inside the
+    0.6-1.4 lane-width check, like the first part of a fork.'''
+    yellow = render(cfg, c, pose, (YELLOW,))
+    white = render(cfg, c, (pose[0], pose[1] + widen, pose[2]), (WHITE,))
+    return yellow + white
+
+
+def test_follow_line_at_fork():
+    # true lane width, no learning, so the expected centres are exact
+    cfg = LaneConfig(learn_lane_width=False, lane_width_px=320.0 * LANE / 0.258)
+    c, pose = straight(), (0.0, 0.0, 0.0)
+
+    def path_y(follow):
+        est = LaneEstimator(cfg)
+        for k in range(4):
+            est.update(fork_dets(cfg, c, pose, 0.07), pose, 0.07 * k, follow_line=follow)
+        d, y, _ = est.path
+        ahead = d >= 0.30                          # the shifted white line is visible from d ~0.29
+        return est.debug['mode'], float(np.mean(y[ahead]))
+
+    mode, y = path_y('both')                        # normal: centre pulled 3.5 cm toward the fork
+    assert mode == 'both' and -0.045 < y < -0.025, y
+    mode, y = path_y('yellow')                      # forced yellow: stays on the yellow-side centre
+    assert mode == 'yellow_only' and abs(y) < 0.008, y
+    mode, y = path_y('white')                       # forced white: follows the diverging white line
+    assert mode == 'white_only' and -0.08 < y < -0.06, y
+
+
 def test_lost_memory_then_search():
     cfg, c = LaneConfig(), straight()
     est = LaneEstimator(cfg)

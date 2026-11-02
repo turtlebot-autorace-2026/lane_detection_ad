@@ -292,7 +292,7 @@ class LaneEstimator:
             y = np.convolve(np.r_[y[0], y, y[-1]], np.ones(3) / 3.0, mode='valid')
         return d, y
 
-    def _centre(self, detections, t, lane_mode):
+    def _centre(self, detections, t, lane_mode, follow_line='both'):
         cfg = self.cfg
         roi = self.roi_mask()
         masks = {YELLOW: np.zeros_like(roi), WHITE: np.zeros_like(roi)}
@@ -302,6 +302,11 @@ class LaneEstimator:
         left = self._trace(masks[YELLOW], YELLOW, t)
         right = self._trace(masks[WHITE], WHITE, t)
         have_l, have_r = left[0] is not None, right[0] is not None
+        # forced single line (mission FSM, e.g. intersection branch): ignore the other line
+        if follow_line == 'yellow':
+            have_r = False
+        elif follow_line == 'white':
+            have_l = False
 
         # pair check: order and width
         if have_l and have_r:
@@ -463,12 +468,13 @@ class LaneEstimator:
 
     # ---- main -------------------------------------------------------------------------
 
-    def update(self, detections, pose, t, lane_mode=True, intersection=False):
+    def update(self, detections, pose, t, lane_mode=True, intersection=False, follow_line='both'):
         '''
         detections: list of (cls, mask HxW bool in BEV coords, conf)
         pose: (x, y, yaw) in the odom frame (odometry or integrated commands)
         t: time [s]
         lane_mode: True -> keep the yellow (left) line when the pair is inconsistent
+        follow_line: 'both' (normal) | 'yellow' | 'white' -> use only that line
         returns (linear_x, angular_z)
         '''
         cfg = self.cfg
@@ -476,7 +482,7 @@ class LaneEstimator:
         self.t_prev = t
         self.debug = {}
 
-        obs, mode = self._centre(detections, t, lane_mode)
+        obs, mode = self._centre(detections, t, lane_mode, follow_line)
         res = self.memory.update(obs, pose, t, cfg)
         out = None
         if res is not None:
