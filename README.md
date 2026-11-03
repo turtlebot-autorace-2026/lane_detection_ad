@@ -248,6 +248,14 @@ ros2 topic pub --once /lane/section_anchor std_msgs/msg/String "{data: after_par
 | `/lane_state` | Bool | 바뀔 때만 반응. 같은 값을 반복해 보내도 추정기를 초기화하지 않는다(새로 시작하려면 false → true) |
 | `/lane/follow_line` | String | `both`(기본) / `yellow` / `white`. 지정한 선 하나만 따라간다(교차로 분기용) |
 | `/intersection_state` | Bool | 속도 제한(`v_max_intersection`)만 켠다. 선배 코드의 25/12/28초 타이머로 `lane_mode`를 바꾸던 동작은 지웠다 |
+| `/lane/offset` | Float32 | 따라가는 경로를 옆으로 민다 (m, + = 왼쪽). 주행 거리 1 m당 `offset_slope`(1.0) m씩 천천히 바뀐다 |
+
+미션 FSM으로 내보내는 것:
+
+| 토픽 | 타입 | 내용 |
+| --- | --- | --- |
+| `/lane/status` | String | 매 프레임 모드: `both` / `yellow_only` / `white_only` / `memory` / `lost` / `search` |
+| `/lane/centre` | Float32MultiArray | `[가로 m (+ = 왼쪽), 방향 rad]` 로봇 기준 차선 중앙(offset 적용 전). 모르면 NaN |
 
 참고: BEV 맨 아래(로봇 앞 17 cm)에서 보이는 폭은 ±12 cm뿐이다. 그래서 로봇 바로 앞에서는 두 선이 동시에 거의 안 보이고, 한쪽 선 모드가 많은 건 정상이다.
 

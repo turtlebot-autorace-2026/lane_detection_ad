@@ -15,7 +15,7 @@ import numpy as np
 import rclpy
 import yaml
 from rclpy.node import Node
-from std_msgs.msg import Bool, String
+from std_msgs.msg import Bool, Float32, Float32MultiArray, String
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 from sensor_msgs.msg import CompressedImage
@@ -83,6 +83,9 @@ class LaneDetection(Node):
         self.create_subscription(Odometry, self.get_parameter('odom_topic').value, self.odom_callback, 10)
         self.create_subscription(String, '/lane/section', self.section_callback, 10)
         self.create_subscription(String, '/lane/follow_line', self.followLine_callback, 10)
+        self.create_subscription(Float32, '/lane/offset', self.offset_callback, 10)
+        self.statusPublisher = self.create_publisher(String, '/lane/status', 10)
+        self.centrePublisher = self.create_publisher(Float32MultiArray, '/lane/centre', 10)
         with open(self.get_parameter('profiles_file').value) as f:
             self.profiles = yaml.safe_load(f) or {}
         self.section = 'auto'
@@ -153,6 +156,12 @@ class LaneDetection(Node):
         if value != self.follow_line:
             self.get_logger().info('follow_line %s -> %s' % (self.follow_line, value))
             self.follow_line = value
+
+    def offset_callback(self, msg):
+        '''Lateral offset of the followed path [m], + = left. Ramped by offset_slope in the estimator.'''
+        if abs(msg.data - self.estimator.offset_target) > 1e-3:
+            self.get_logger().info('offset -> %+.3f m' % msg.data)
+        self.estimator.offset_target = float(msg.data)
 
     def stateSubscriber_callback(self, msg):
         '''Edge-triggered: a repeated True/False is ignored, so the mission FSM can re-send it
@@ -238,6 +247,9 @@ class LaneDetection(Node):
         twist.linear.x = v
         twist.angular.z = w
         self.velocityPublisher.publish(twist)
+        self.statusPublisher.publish(String(data=self.estimator.debug.get('mode', '')))
+        c = self.estimator.centre
+        self.centrePublisher.publish(Float32MultiArray(data=[float('nan')] * 2 if c is None else list(c)))
 
         if self.debugPublisher is not None or self.show:
             view = self.estimator.draw(bev, detections)

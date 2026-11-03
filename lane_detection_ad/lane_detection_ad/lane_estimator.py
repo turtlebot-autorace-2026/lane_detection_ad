@@ -93,6 +93,8 @@ DEFAULTS = {
     'max_lin_acc': 0.3,            # m/s^2
     'search_after': 1.0,           # s stopped before rotate-search
     'search_ang': 0.4,             # rad/s
+    # lateral offset of the followed path (mission FSM, e.g. construction avoidance)
+    'offset_slope': 1.0,           # max offset change per m driven (1.0 = 45 deg approach)
 }
 
 
@@ -260,6 +262,9 @@ class LaneEstimator:
         self.line_px = {YELLOW: None, WHITE: None}   # traced [(row, x)] for drawing / next frame
         self.line_t = {YELLOW: -1e9, WHITE: -1e9}
         self.path = None
+        self.centre = None           # (lateral m + = left, heading rad) of the lane centre at the robot
+        self.offset = 0.0            # m, current lateral path offset (+ = left), ramps to offset_target
+        self.offset_target = 0.0
         self.debug = {'mode': 'init'}
 
     # ---- perception -------------------------------------------------------------------
@@ -484,11 +489,22 @@ class LaneEstimator:
 
         obs, mode = self._centre(detections, t, lane_mode, follow_line)
         res = self.memory.update(obs, pose, t, cfg)
+        # offset ramps with distance driven so a step command does not become a steering step
+        step = cfg.offset_slope * max(self.v_cmd * dt, 0.002)
+        self.offset += float(np.clip(self.offset_target - self.offset, -step, step))
         out = None
+        self.centre = None
         if res is not None:
             d, y, source = res
             if source == 'memory':
                 mode = 'memory'
+            near = (d > -0.10) & (d < 0.30)
+            if near.sum() >= 3 and np.ptp(d[near]) > 0.05:
+                b, a = np.polyfit(d[near], y[near], 1)
+                th = math.atan(b)
+                self.centre = (float(a * math.cos(th)), float(th))   # lane centre: lateral (+ left), heading
+            if abs(self.offset) > 1e-4:         # memory keeps the lane centre, control follows centre + offset
+                d, y = _offset(d, y, -self.offset)
             self.path = (d, y, source)
             out = self._control(d, y, t, mode, intersection, pose)
         else:
@@ -509,7 +525,7 @@ class LaneEstimator:
 
         self.v_cmd, self.w_cmd = float(v), float(w)
         self.travel += self.v_cmd * dt
-        self.debug.update(mode=mode, v=self.v_cmd, w=self.w_cmd, lane_width=self.lane_width)
+        self.debug.update(mode=mode, v=self.v_cmd, w=self.w_cmd, lane_width=self.lane_width, offset=self.offset)
         return self.v_cmd, self.w_cmd
 
     # ---- debug view -------------------------------------------------------------------
@@ -543,6 +559,8 @@ class LaneEstimator:
     def debug_lines(self):
         d = self.debug
         lines = ['%s v=%.3f w=%+.2f' % (d.get('mode', ''), d.get('v', 0.0), d.get('w', 0.0))]
+        if abs(d.get('offset', 0.0)) > 1e-3:
+            lines[0] += ' off=%+.0fmm' % (d['offset'] * 1000)
         if 'e_y' in d:
             lines.append('e_y=%+.0fmm e_th=%+.1fdeg margin=%.0fmm'
                          % (d['e_y'] * 1000, math.degrees(d['e_th']), d['margin'] * 1000))

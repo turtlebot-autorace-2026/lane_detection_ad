@@ -142,6 +142,50 @@ def test_follow_line_at_fork():
     assert mode == 'white_only' and -0.08 < y < -0.06, y
 
 
+def test_offset_shifts_path_gradually():
+    '''/lane/offset: +8 cm (left) on a straight, closed loop with delay. Reaches the offset,
+    does not overshoot, and the shift is spread over distance (offset_slope).'''
+    cfg, c = LaneConfig(), course([(3.0, 0.0)])
+    est = LaneEstimator(cfg)
+    pose, t, dt = [0.0, 0.0, 0.0], 0.0, 1.0 / 15
+    queue = [(0.0, 0.0)] * 2
+    ys = []
+    for k in range(260):
+        if k == 30:
+            est.offset_target = 0.08
+        v, w = est.update(render(cfg, c, tuple(pose)), tuple(pose), t)
+        queue.append((v, w))
+        va, wa = queue.pop(0)
+        for _ in range(4):
+            h = dt / 4
+            pose[0] += va * h * math.cos(pose[2])
+            pose[1] += va * h * math.sin(pose[2])
+            pose[2] += wa * h
+        t += dt
+        ys.append((pose[0], pose[1]))
+        if pose[0] > 2.3:
+            break
+    ys = np.array(ys)
+    assert abs(ys[-1, 1] - 0.08) < 0.01, ys[-1]
+    assert ys[:, 1].max() < 0.095, ys[:, 1].max()
+    start = ys[np.argmax(ys[:, 1] > 0.005), 0]
+    reach = ys[np.argmax(ys[:, 1] > 0.07), 0]
+    assert reach - start > 0.07, (start, reach)     # not a step: spread over > 7 cm of travel
+
+
+def test_centre_reported_in_robot_frame():
+    # true lane width (a fresh estimator would use the 258 mm default in single-line mode)
+    cfg, c = LaneConfig(lane_width_px=320.0 * LANE / 0.258), straight()
+    for pose in ((0.0, -0.03, 0.0), (0.0, 0.02, math.radians(15))):
+        est = LaneEstimator(cfg)
+        est.offset_target = 0.1                     # offset must not change the reported centre
+        for k in range(4):
+            est.update(render(cfg, c, pose), pose, 0.07 * k)
+        cy, cth = est.centre                        # perpendicular distance to the centre line, + = left
+        assert abs(cy - (-pose[1])) < 0.006, (pose, cy)
+        assert abs(cth + pose[2]) < math.radians(3), (pose, math.degrees(cth))
+
+
 def test_lost_memory_then_search():
     cfg, c = LaneConfig(), straight()
     est = LaneEstimator(cfg)
